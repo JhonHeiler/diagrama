@@ -1,51 +1,60 @@
-# diagrama
+classDiagram
+  class WorkCenter {
+    +id
+    +name
+    +external_code
+    +created_at
+  }
 
-flowchart LR
-  %% Swimlanes por actor
-  subgraph NEGOCIO["🟦 Negocio (Empresa Cliente)"]
-    N1[Configura necesidad:\n- Centros de trabajo\n- Subcategorías (etiquetas)\n- Correos destino]
-  end
+  class AssociationCode {
+    +id
+    +code
+    +name
+    +emails : string[]  // al menos 1
+    +status
+    +created_at
+  }
 
-  subgraph UI["🟩 SuAporte / WIEN (UI)"]
-    U1[Cargar CSV Códigos de Asociación\n(código,nombre,correo1..n)]
-    U2[Cargar CSV Empleado↔Código\n(tipo_doc,num_doc,código)]
-    U3[Ejecutar Envío\n(período, con/sin valores,\n filtros opcionales)]
-    U4[Reenvío Manual / Histórico]
-    U5[Panel de Trazabilidad\n(estados, logs, descargas)]
-  end
+  class Employee {
+    +id
+    +doc_type
+    +doc_number
+    +full_name
+    +work_center_id
+  }
 
-  subgraph BE["🟧 Backend SuAporte"]
-    B1[Validar CSVs y Persistir\n- association_code\n- employee_association]
-    B2[Crear Delivery Jobs\npor código de asociación]
-    B3[Orquestar Descargas\nAutoliquidación / Valores x Admin]
-    B4[Unir PDFs → 1 por Código\nRenombrar y Guardar]
-    B5[Enviar Emails\n(≥1 correo obligatorio)]
-    B6[Actualizar Estado y Auditoría\n(PENDING/RUNNING/DONE/FAILED)]
-    B7[Reintentos y Reprocesos\n idempotentes]
-  end
+  class EmployeeAssociation {
+    +id
+    +employee_id
+    +association_code_id
+    +valid_from
+    +valid_to
+  }
 
-  subgraph AP["🟨 Proveedor (Aportes en Línea / Fuente)"]
-    A1[(Autoliquidación PDF)]
-    A2[(Valores por Administradora PDF)]
-  end
+  class DeliveryJob {
+    +id
+    +period        // YYYY-MM
+    +association_code_id
+    +mode          // WITH_VALUES | NO_VALUES
+    +status        // PENDING | RUNNING | DONE | FAILED
+    +file_url
+    +error_msg
+    +created_at
+    +updated_at
+  }
 
-  subgraph DEST["🟪 Destinatarios"]
-    D1[Correos configurados por Código]
-    D2[Repositorio de Archivos\n(Blob/S3) con enlaces]
-  end
+  class AuditLog {
+    +id
+    +entity
+    +entity_id
+    +action
+    +performed_by
+    +timestamp
+    +details
+  }
 
-  N1 --> U1 --> B1
-  U2 --> B1 --> B2
-  U3 --> B2
-  B2 --> B3
-  B3 -->|descarga| A1
-  B3 -->|descarga| A2
-  A1 --> B4
-  A2 --> B4
-  B4 --> D2
-  B4 --> B5
-  B5 --> D1
-  B5 --> B6
-  U5 --> B6
-  U4 --> B7
-  B7 --> B3
+  Employee "1" --> "1" WorkCenter : belongs to
+  Employee "1" -- "0..*" EmployeeAssociation : memberships
+  AssociationCode "1" -- "0..*" EmployeeAssociation : groups
+  AssociationCode "1" -- "0..*" DeliveryJob : deliveries
+  DeliveryJob "1" -- "0..*" AuditLog : traces
